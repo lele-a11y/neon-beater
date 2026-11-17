@@ -3,9 +3,10 @@
 import { audioCtx } from './synth.js';
 import { instruments } from './instruments/index.js';
 import {
-  events, state, tracks, fitSteps, canEdit, play, stop, setBpm, shareTrack, resetSound,
-  claimTrack, releaseTrack, addTrack, removeTrack, NUM_STEPS, MAX_TRACKS,
+  events, state, tracks, players, fitSteps, canEdit, play, stop, setBpm, shareTrack, resetSound,
+  claimTrack, releaseTrack, addTrack, addTrackValue, removeTrack, NUM_STEPS, MAX_TRACKS,
 } from './sequencer.js';
+import { beatTemplates } from './templates.js';
 import { connect, isOnline, roomId } from './net.js';
 import { saveState, loadState } from './storage.js';
 import { attachKnob } from './knobs.js';
@@ -255,6 +256,7 @@ function syncTracks() {
   });
 
   updateAddBar();
+  updateTplBar();
 }
 
 function renderTrack(track) {
@@ -262,6 +264,8 @@ function renderTrack(track) {
 
   const root = document.createElement('div');
   root.className = 'track panel';
+  root.style.setProperty('--inst-on', `var(--step-on-${instrument.color})`);
+  root.style.setProperty('--inst-glow', `var(--glow-${instrument.color})`);
 
   // Info column
   const infoCol = document.createElement('div');
@@ -269,7 +273,7 @@ function renderTrack(track) {
 
   infoCol.innerHTML = `
     <div class="track-header">
-      <span class="track-name color-${instrument.color}">${instrument.name}</span>
+      <span class="track-name color-${instrument.color}">${instrument.icon}${instrument.name}</span>
       <div class="track-buttons">
         <button class="claim-btn btn btn-sm"></button>
         <button class="default-btn btn btn-sm">Default</button>
@@ -413,6 +417,7 @@ function renderTrack(track) {
 
     muteBtn.disabled = !canEdit(track);
     removeBtn.disabled = !canEdit(track);
+    defaultBtn.disabled = !canEdit(track);
 
     claimBtn.hidden = !isOnline();
     claimBtn.disabled = track.owner === 'other';
@@ -450,7 +455,7 @@ instruments.forEach(instrument => {
   const btn = document.createElement('button');
 
   btn.className = `btn btn-sm add-btn color-${instrument.color}`;
-  btn.textContent = '+ ' + instrument.name;
+  btn.innerHTML = `${instrument.icon} + ${instrument.name}`;
 
   btn.addEventListener('click', () => addTrack(instrument));
 
@@ -468,6 +473,66 @@ function updateAddBar() {
       : 'Add a free instrument';
   });
 }
+
+// ---------- Templates ----------
+
+const tplBar = document.getElementById('tplBar');
+
+// A template replaces every track, so it needs all of them editable
+// and always asks first: tracks, sounds, presets and tempo are lost.
+const tplConfirm = document.getElementById('tplConfirm');
+const tplConfirmName = document.getElementById('tplConfirmName');
+let tplPending = null;
+
+function applyTemplate(tpl) {
+  if (tracks.some(t => !canEdit(t))) return;
+  tracks.forEach(t => removeTrack(t));
+  tpl.tracks.forEach(t => addTrackValue({ instrument: t.instrument, params: t.params, steps: t.steps }));
+  if (tpl.bpm) {
+    if (isOnline()) setBpm(tpl.bpm);
+    else { state.transport.bpm = tpl.bpm; setBpmUI(tpl.bpm); }
+  }
+  saveState();
+}
+
+function updateTplBar() {
+  const locked = tracks.some(t => !canEdit(t));
+  tplBar.querySelectorAll('button').forEach(btn => {
+    btn.disabled = locked;
+    btn.title = locked
+      ? 'Release claimed instruments first'
+      : `Replace everything with the ${btn.dataset.name} template`;
+  });
+}
+
+beatTemplates.forEach(tpl => {
+  const btn = document.createElement('button');
+  btn.className = 'btn tpl-btn';
+  btn.dataset.name = tpl.name;
+  btn.textContent = tpl.name;
+  btn.title = `Replace everything with the ${tpl.name} template`;
+  btn.addEventListener('click', () => {
+    if (tracks.some(t => !canEdit(t))) return;
+    tplPending = tpl;
+    tplConfirmName.textContent = tpl.name;
+    tplConfirm.hidden = false;
+  });
+  tplBar.appendChild(btn);
+});
+
+function closeTplConfirm() {
+  tplConfirm.hidden = true;
+  tplPending = null;
+}
+
+document.getElementById('tplCancel').addEventListener('click', closeTplConfirm);
+document.getElementById('tplApply').addEventListener('click', () => {
+  const tpl = tplPending;
+  closeTplConfirm();
+  if (tpl) applyTemplate(tpl);
+});
+tplConfirm.addEventListener('click', e => { if (e.target === tplConfirm) closeTplConfirm(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTplConfirm(); });
 
 // ---------- Controls ----------
 
@@ -515,12 +580,38 @@ events.addEventListener('transport', () => {
 
 events.addEventListener('track', e => {
   trackViews.get(e.detail.id)?.refresh();
+  updateTplBar();
   saveState();
 });
 
 events.addEventListener('tracks', () => {
   syncTracks();
   saveState();
+});
+
+// ---------- Players ----------
+
+const playerCount = document.getElementById('playerCount');
+const playersList = document.getElementById('playersList');
+const playerColors = ['#00f5ff', '#22ff88', '#ff2d78', '#ffe600', '#a78bfa', '#fb923c', '#38bdf8', '#4ade80'];
+
+events.addEventListener('players', () => {
+  playerCount.textContent = players.length;
+  playersList.innerHTML = '';
+  if (!players.length) {
+    playersList.innerHTML = '<span class="empty-players">Waiting for DJs...</span>';
+    return;
+  }
+  players.forEach((p, i) => {
+    const badge = document.createElement('span');
+    badge.className = 'player-badge' + (p.me ? ' me' : '');
+    const dot = document.createElement('span');
+    dot.className = 'player-color';
+    dot.style.color = playerColors[i % playerColors.length];
+    badge.appendChild(dot);
+    badge.appendChild(document.createTextNode(p.me ? `${p.name} (you)` : p.name));
+    playersList.appendChild(badge);
+  });
 });
 
 // ---------- Play / Stop ----------
@@ -585,7 +676,7 @@ bpmInput.addEventListener('input', e => {
 // ---------- Keyboard shortcuts ----------
 
 document.addEventListener('keydown', e => {
-  if (!joinOverlay.hidden) return;
+  if (!joinOverlay.hidden || !tplConfirm.hidden) return;
 
   if (e.code === 'Space' || e.code === 'Enter') {
     if (
@@ -613,11 +704,42 @@ setBpmUI(state.transport.bpm);
 
 syncTracks();
 
-// Join room
+// Join room. The overlay's click doubles as the AudioContext gesture, so a
+// rejoin skips it and the first click or key unlocks audio instead.
+const joinedKey = 'simpelSamplerJoinedRoom';
+const nameKey = 'simpelSamplerName';
+let rejoin = false;
+try { rejoin = roomId && localStorage.getItem(joinedKey) === roomId; } catch (e) { /* storage blocked */ }
+
+function userName() {
+  try {
+    const n = localStorage.getItem(nameKey);
+    if (n) return n;
+  } catch (e) { /* storage blocked */ }
+  return document.getElementById('playerName').value.trim() || 'DJ';
+}
+
+const unlockAudio = () => { if (audioCtx.state !== 'running') audioCtx.resume(); };
+addEventListener('pointerdown', unlockAudio);
+addEventListener('keydown', unlockAudio);
+
 document.getElementById('joinBtn').addEventListener('click', async () => {
+  const name = userName();
+  try { localStorage.setItem(joinedKey, roomId); localStorage.setItem(nameKey, name); } catch (e) { /* storage blocked */ }
+
   await audioCtx.resume();
 
   joinOverlay.hidden = true;
 
-  connect();
+  connect(name);
 });
+
+// Enter in the name field joins too
+document.getElementById('playerName').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('joinBtn').click();
+});
+
+if (rejoin) {
+  joinOverlay.hidden = true;
+  connect(userName());
+}

@@ -5,7 +5,8 @@ import { lerp } from '../synth.js';
 export default {
   id: 'kick',
   name: 'Kick',
-  color: 'green',
+  color: 'red',
+  icon: '<svg class=\'inst-icon\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'12\' cy=\'14\' r=\'8\'/><path d=\'M15 1L9 12\'/></svg>',
   params: { pitch: 0.25, bend: 0.8, decay: 0.4, timbre: 0.0, punch: 0.3, gain: 1.0, distortion: 0.0 },
   knobs: [
     { key: 'pitch', label: 'Pitch' },

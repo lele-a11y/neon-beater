@@ -44,8 +44,9 @@ func roomWithTrack(t *testing.T) (*room, *client, *client) {
 	rm := testRoom()
 	rm.add(json.RawMessage(`{"instrument":"kick","steps":[1,0]}`))
 	alice, bob := testClient("alice"), testClient("bob")
-	rm.join(alice)
-	rm.join(bob)
+	rm.join(alice, "Alice")
+	rm.join(bob, "Bob")
+	rm.claim("alice", 0)
 	if rm.tracks[0].owner != "alice" {
 		t.Fatalf("owner = %q, want alice", rm.tracks[0].owner)
 	}
@@ -178,18 +179,20 @@ func TestRemove(t *testing.T) {
 func TestSeedOnlyOnce(t *testing.T) {
 	rm := testRoom()
 	alice := testClient("alice")
-	rm.join(alice)
+	rm.join(alice, "Alice")
 	rm.seed([]json.RawMessage{json.RawMessage(`{"instrument":"kick"}`), json.RawMessage(`{"instrument":"snare"}`)})
 	rm.seed([]json.RawMessage{json.RawMessage(`{"instrument":"hihat"}`)})
 	if len(rm.tracks) != 2 {
 		t.Errorf("tracks = %d, want 2", len(rm.tracks))
 	}
-	if rm.tracks[0].owner != "alice" {
-		t.Error("the client in the empty room got no track after the seed")
+	if rm.tracks[0].owner != "" {
+		t.Error("the seed claimed a track for the client")
 	}
 
 	// An emptied room stays empty
+	rm.claim("alice", 0)
 	rm.remove("alice", 0)
+	rm.claim("alice", 1)
 	rm.remove("alice", 1)
 	rm.seed([]json.RawMessage{json.RawMessage(`{}`)})
 	if len(rm.tracks) != 0 {
@@ -227,6 +230,34 @@ func TestClaim(t *testing.T) {
 		t.Errorf("bob's owners = %s", m.Value)
 	}
 	received(alice)
+}
+
+func TestPlayers(t *testing.T) {
+	rm := testRoom()
+	alice, bob := testClient("alice"), testClient("bob")
+	rm.join(alice, "Alice")
+	rm.join(bob, "Bob")
+	received(alice)
+
+	var found bool
+	for _, m := range received(bob) {
+		if m.Type == "players" {
+			found = true
+			if string(m.Value) != `[{"name":"Alice","me":false},{"name":"Bob","me":true}]` {
+				t.Errorf("bob's players = %s", m.Value)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("bob got no players message")
+	}
+
+	rm.leave(bob)
+	for _, m := range received(alice) {
+		if m.Type == "players" && string(m.Value) != `[{"name":"Alice","me":true}]` {
+			t.Errorf("alice's players after bob left = %s", m.Value)
+		}
+	}
 }
 
 func TestLimiter(t *testing.T) {

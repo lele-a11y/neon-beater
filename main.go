@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -126,6 +127,13 @@ func (srv *server) servePage(w http.ResponseWriter, r *http.Request) {
 func (srv *server) serveWS(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("room")
 	user := r.URL.Query().Get("user")
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if rs := []rune(name); len(rs) > 24 {
+		name = string(rs[:24])
+	}
+	if name == "" {
+		name = "DJ"
+	}
 	if !validRoom.MatchString(id) || !validUser.MatchString(user) {
 		http.Error(w, "invalid room or user", http.StatusBadRequest)
 		return
@@ -163,7 +171,7 @@ func (srv *server) serveWS(w http.ResponseWriter, r *http.Request) {
 		srv.rooms[id] = rm
 	}
 	srv.conns[ip]++
-	rm.join(c)
+	rm.join(c, name)
 	srv.mu.Unlock()
 
 	defer func() {

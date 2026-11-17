@@ -6,6 +6,7 @@ export default {
   id: 'hihat',
   name: 'Hi-Hat',
   color: 'yellow',
+  icon: '<svg class=\'inst-icon\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><path d=\'M3.5 7.5h17M3.5 14.5h17\'/><path d=\'M12 14.5V21M8.5 21h7\'/></svg>',
   params: { pitch: 0.45, resonance: 0.2, decay: 0.15, body: 0.4, mix: 0.2, gain: 0.7, distortion: 0.0 },
   knobs: [
     { key: 'pitch', label: 'Pitch' },

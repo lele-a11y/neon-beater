@@ -3,7 +3,8 @@ import { lerp } from '../synth.js';
 export default {
   id: 'cymbal',
   name: 'Cymbal',
-  color: 'yellow',
+  color: 'lightyellow',
+  icon: '<svg class=\'inst-icon\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><ellipse cx=\'12\' cy=\'7\' rx=\'9.5\' ry=\'3.5\'/><path d=\'M12 10.5V20M8.5 20h7\'/></svg>',
   params: { pitch: 0.7, metal: 0.8, resonance: 0.4, decay: 0.6, mix: 0.5, gain: 0.7, distortion: 0 },
   knobs: [
     { key: 'pitch', label: 'Pitch' },

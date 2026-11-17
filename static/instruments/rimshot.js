@@ -3,7 +3,8 @@ import { lerp } from '../synth.js';
 export default {
   id: 'rimshot',
   name: 'Rimshot',
-  color: 'yellow',
+  color: 'purple',
+  icon: '<svg class=\'inst-icon\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'12\' cy=\'14\' r=\'7\'/><path d=\'M4 3l16 14M20 3L4 17\'/></svg>',
   params: { pitch: 0.5, snap: 0.8, tone: 0.6, decay: 0.12, noise: 0.3, gain: 0.8, distortion: 0 },
   knobs: [
     { key: 'pitch', label: 'Pitch' },

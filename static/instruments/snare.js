@@ -5,7 +5,8 @@ import { lerp, waveAt } from '../synth.js';
 export default {
   id: 'snare',
   name: 'Snare',
-  color: 'red',
+  color: 'orange',
+  icon: '<svg class=\'inst-icon\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><rect x=\'4.5\' y=\'8\' width=\'15\' height=\'10\' rx=\'2\'/><ellipse cx=\'12\' cy=\'8\' rx=\'7.5\' ry=\'2.2\'/><path d=\'M8 18l-1.5 4M16 18l1.5 4\'/></svg>',
   params: { tone: 0.3, wave: 0.3, snap: 0.15, noise: 0.7, decay: 0.35, gain: 1.0, distortion: 0.0 },
   knobs: [
     { key: 'tone', label: 'Tone' },

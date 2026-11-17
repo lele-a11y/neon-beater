@@ -1,6 +1,6 @@
 // Keeps a copy of each room (tempo, patterns, sounds, presets) in localStorage,
 // so the room can be restored after a server restart. A new room starts with
-// the default kit.
+// all instruments and empty steps.
 
 import { state, tracks, trackValue, loadTracks, cleanBpm } from './sequencer.js';
 import { roomId } from './net.js';
@@ -61,7 +61,7 @@ export function loadState() {
     if (!raw) return;
     const data = JSON.parse(raw);
     if (data.bpm) state.transport.bpm = cleanBpm(data.bpm);
-    // Same validation as remote values. Without any valid track the default kit stays.
+    // Same validation as remote values. Without any valid track the initial tracks stay.
     if (Array.isArray(data.tracks)) loadTracks(data.tracks);
   } catch (err) {
     console.error('Failed to load sampler state', err);

@@ -61,10 +61,11 @@ type room struct {
 	transport  json.RawMessage
 	tracks     map[int]*track
 	clients    map[*client]struct{}
-	conns      map[string]int // open connections per user
-	nextTrack  int            // ID of the next added track; IDs are never reused
-	seeded     bool           // the room got its first tracks; an emptied room stays empty
-	creator    string         // IP that created the room, for the per-IP limit
+	conns      map[string]int    // open connections per user
+	names      map[string]string // display name per user
+	nextTrack  int               // ID of the next added track; IDs are never reused
+	seeded     bool              // the room got its first tracks; an emptied room stays empty
+	creator    string            // IP that created the room, for the per-IP limit
 	lastActive time.Time
 }
 
@@ -74,6 +75,7 @@ func newRoom(mu *sync.Mutex, creator string) *room {
 		tracks:     make(map[int]*track),
 		clients:    make(map[*client]struct{}),
 		conns:      make(map[string]int),
+		names:      make(map[string]string),
 		creator:    creator,
 		lastActive: time.Now(),
 	}
@@ -99,12 +101,10 @@ func (rm *room) trackValue(n int) json.RawMessage {
 	return out
 }
 
-func (rm *room) join(c *client) {
+func (rm *room) join(c *client, name string) {
 	rm.clients[c] = struct{}{}
 	rm.conns[c.user]++
-
-	// Everyone gets an instrument while one is free
-	claimed := rm.claimFree(c.user)
+	rm.names[c.user] = name
 
 	snapshot := make(map[string]json.RawMessage, len(rm.tracks)+2)
 	if rm.transport != nil {
@@ -116,10 +116,7 @@ func (rm *room) join(c *client) {
 	snapshot["owners"] = rm.ownersFor(c.user)
 	msg, _ := json.Marshal(outbound{Type: "state", State: snapshot})
 	enqueue(c, msg)
-
-	if claimed {
-		rm.broadcastOwners()
-	}
+	rm.broadcastPlayers()
 }
 
 func (rm *room) leave(c *client) {
@@ -130,6 +127,8 @@ func (rm *room) leave(c *client) {
 		return
 	}
 	delete(rm.conns, c.user)
+	delete(rm.names, c.user)
+	rm.broadcastPlayers()
 	time.AfterFunc(claimGrace, func() {
 		rm.mu.Lock()
 		defer rm.mu.Unlock()
@@ -234,16 +233,6 @@ func (rm *room) seed(values []json.RawMessage) {
 	for _, v := range values {
 		rm.add(v)
 	}
-	// Clients that joined the empty room get an instrument now
-	claimed := false
-	for c := range rm.clients {
-		if rm.claimFree(c.user) {
-			claimed = true
-		}
-	}
-	if claimed {
-		rm.broadcastOwners()
-	}
 }
 
 // claim gives the track to the user, releasing any track they had before.
@@ -256,20 +245,6 @@ func (rm *room) claim(user string, n int) {
 	}
 	rm.tracks[n].owner = user
 	rm.broadcastOwners()
-}
-
-// claimFree gives a user without a track the first free one, if any.
-func (rm *room) claimFree(user string) bool {
-	if rm.trackOf(user) >= 0 {
-		return false
-	}
-	for _, n := range slices.Sorted(maps.Keys(rm.tracks)) {
-		if rm.tracks[n].owner == "" {
-			rm.tracks[n].owner = user
-			return true
-		}
-	}
-	return false
 }
 
 func (rm *room) release(user string, n int) {
@@ -316,6 +291,31 @@ func (rm *room) ownersFor(user string) json.RawMessage {
 func (rm *room) broadcastOwners() {
 	for c := range rm.clients {
 		msg, _ := json.Marshal(outbound{Type: "set", Key: "owners", Value: rm.ownersFor(c.user)})
+		enqueue(c, msg)
+	}
+}
+
+// playersFor lists the room's users by display name, like ownersFor only
+// marking which entry is the recipient's own.
+func (rm *room) playersFor(user string) json.RawMessage {
+	type player struct {
+		Name string `json:"name"`
+		Me   bool   `json:"me"`
+	}
+	users := slices.SortedFunc(maps.Keys(rm.names), func(a, b string) int {
+		return strings.Compare(rm.names[a], rm.names[b])
+	})
+	out := make([]player, 0, len(users))
+	for _, u := range users {
+		out = append(out, player{rm.names[u], u == user})
+	}
+	b, _ := json.Marshal(out)
+	return b
+}
+
+func (rm *room) broadcastPlayers() {
+	for c := range rm.clients {
+		msg, _ := json.Marshal(outbound{Type: "players", Value: rm.playersFor(c.user)})
 		enqueue(c, msg)
 	}
 }

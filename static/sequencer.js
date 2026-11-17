@@ -25,6 +25,9 @@ export const state = {
 // Tracks in display order, by ID. track.instrument (a module from instruments/)
 // defines the sound and knobs; everything else is the track's own state.
 export const tracks = [];
+
+// Users in the room, from the server's players message: { name, me }.
+export const players = [];
 let owners = {}; // latest ownership view from the server, by track ID
 
 function ownerOf(id) {
@@ -53,7 +56,7 @@ function newTrackValue(instrument, steps = []) {
   return { instrument: instrument.id, steps, params: { ...instrument.params } };
 }
 
-// Replaces the tracks with local ones (saved or the default kit), numbered from 0.
+// Replaces the tracks with local ones (saved or the empty kit), numbered from 0.
 // Returns false and keeps the current tracks if none of the values is valid.
 export function loadTracks(values) {
   const loaded = values.map(cleanTrack).filter(Boolean);
@@ -297,6 +300,12 @@ listen({
       if (id !== null) applyTrackKey(id, field, value, own);
     }
   },
+  players(list) {
+    players.splice(0, players.length, ...(Array.isArray(list) ? list : [])
+      .filter(p => p && typeof p.name === 'string')
+      .map(p => ({ name: [...p.name].slice(0, 24).join(''), me: p.me === true })));
+    events.dispatchEvent(new Event('players'));
+  },
 });
 
 // ---------- Actions ----------
@@ -343,11 +352,14 @@ export function resetSound(track) {
 
 // Online, adding and removing apply when the server echoes them; offline the
 // change is only local.
-export function addTrack(instrument) {
+export function addTrackValue(value) {
   if (tracks.length >= MAX_TRACKS) return;
-  const value = newTrackValue(instrument);
   if (isOnline()) add(value);
   else applyTrackKey(Math.max(-1, ...tracks.map(t => t.id)) + 1, null, value);
+}
+
+export function addTrack(instrument) {
+  addTrackValue(newTrackValue(instrument));
 }
 
 export function removeTrack(track) {
@@ -359,4 +371,4 @@ export function removeTrack(track) {
 export function claimTrack(track) { claim(track.id); }
 export function releaseTrack(track) { release(track.id); }
 
-loadTracks(defaultKit.map(instrument => newTrackValue(instrument, instrument.steps)));
+loadTracks(defaultKit.map(instrument => newTrackValue(instrument)));

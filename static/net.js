@@ -20,7 +20,7 @@ let clockOffset = 0;      // server clock minus client clock (ms)
 const clockSamples = [];  // recent { rtt, offset } measurements
 let synced = false;       // true once the clock offset is known
 let queued = [];          // messages received before the clock was synced
-let handlers = { state() {}, set() {} };
+let handlers = { state() {}, set() {}, players() {} };
 let retryDelay = 1000;    // grows while the server keeps refusing us, e.g. a full room
 
 function clientNow() { return performance.timeOrigin + performance.now(); }
@@ -55,6 +55,7 @@ export function seed(values) { request({ type: 'seed', value: values }); }
 function handleMessage(msg) {
   if (msg.type === 'state') handlers.state(msg.state || {});
   else if (msg.type === 'set') handlers.set(msg.key, msg.value, msg.own === true, msg.field);
+  else if (msg.type === 'players') handlers.players(Array.isArray(msg.value) ? msg.value : []);
 }
 
 function onPong(msg) {
@@ -71,9 +72,9 @@ function onPong(msg) {
   }
 }
 
-export function connect() {
+export function connect(name) {
   if (!roomId) return;
-  const url = `${location.protocol === 'https:' ? 'wss://' : 'ws://'}${location.host}/ws/${roomId}?user=${userId}`;
+  const url = `${location.protocol === 'https:' ? 'wss://' : 'ws://'}${location.host}/ws/${roomId}?user=${userId}&name=${encodeURIComponent(name || '')}`;
   const socket = new WebSocket(url);
   ws = socket;
   synced = false;
@@ -97,7 +98,7 @@ export function connect() {
   socket.addEventListener('close', () => {
     clearInterval(pingTimer);
     if (ws !== socket) return;
-    setTimeout(connect, retryDelay);
+    setTimeout(() => connect(name), retryDelay);
     retryDelay = Math.min(retryDelay * 2, 30000);
   });
 }

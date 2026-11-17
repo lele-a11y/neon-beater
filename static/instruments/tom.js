@@ -4,6 +4,7 @@ export default {
   id: 'tom',
   name: 'Tom',
   color: 'green',
+  icon: '<svg class=\'inst-icon\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><ellipse cx=\'12\' cy=\'8\' rx=\'8\' ry=\'2.5\'/><path d=\'M4 8v9c0 4 16 4 16 0V8\'/><path d=\'M9 18.5L7.5 22M15 18.5l1.5 3.5\'/></svg>',
   params: { pitch: 0.35, bend: 0.7, decay: 0.4, tone: 0.3, punch: 0.3, gain: 0.9, distortion: 0 },
   knobs: [
     { key: 'pitch', label: 'Pitch' },

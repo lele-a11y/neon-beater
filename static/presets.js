@@ -105,7 +105,7 @@ function renderPresetRow(row, track, edit, { list, field, label, snapshot, resto
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'save-btn';
-  saveBtn.textContent = label;
+  saveBtn.textContent = 'Save ' + label;
   // A full row stays draggable, so its presets can still be overwritten
   saveBtn.title = presets.length >= MAX_PRESETS
     ? `At most ${MAX_PRESETS} presets: drag onto a number to overwrite it`
